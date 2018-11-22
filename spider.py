@@ -1,23 +1,37 @@
+import time
+from config import *
+from urllib.parse import quote
+
 import pymongo
+from pyquery import PyQuery as pq
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
-from pyquery import PyQuery as pq
-from config import *
-from urllib.parse import quote
+import json
 
 # browser = webdriver.Chrome()
 # browser = webdriver.PhantomJS(service_args=SERVICE_ARGS)
 
 chrome_options = webdriver.ChromeOptions()
-chrome_options.add_argument('--headless')
+# chrome_options.add_argument('--headless')
 browser = webdriver.Chrome(chrome_options=chrome_options)
 
 wait = WebDriverWait(browser, 10)
 client = pymongo.MongoClient(MONGO_URL)
 db = client[MONGO_DB]
+
+
+def load_cookies():
+    browser.get('https://www.taobao.com')
+    print('loading cookies...')
+    with open('taobao-cookies.json', 'r') as json_file:
+        data = json.load(json_file)
+
+    for item in data:
+        browser.add_cookie(item)
+    print('loading cookies done.')
 
 
 def index_page(page):
@@ -39,7 +53,8 @@ def index_page(page):
             submit.click()
         wait.until(
             EC.text_to_be_present_in_element((By.CSS_SELECTOR, '#mainsrp-pager li.item.active > span'), str(page)))
-        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '.m-itemlist .items .item')))
+        wait.until(EC.presence_of_element_located(
+            (By.CSS_SELECTOR, '.m-itemlist .items .item')))
         get_products()
     except TimeoutException:
         index_page(page)
@@ -78,12 +93,17 @@ def save_to_mongo(result):
 
 
 def main():
+    load_cookies()
     """
     遍历每一页
     """
-    for i in range(1, MAX_PAGE + 1):
-        index_page(i)
-    browser.close()
+    try:
+        for i in range(1, MAX_PAGE + 1):
+            index_page(i)
+            print('sleeping 20 seconds...')
+            time.sleep(20)
+    finally:
+        browser.close()
 
 
 if __name__ == '__main__':
